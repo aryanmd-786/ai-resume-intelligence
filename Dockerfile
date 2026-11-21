@@ -2,8 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System dependencies install karein
-RUN apt-get update && apt-get install -y curl procps && \
+# System dependencies install karein (zstd add kiya hai)
+RUN apt-get update && apt-get install -y curl procps zstd ca-certificates && \
     curl -fsSL https://ollama.com/install.sh | sh
 
 # Python dependencies copy aur install karein
