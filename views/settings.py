@@ -10,12 +10,19 @@ from __future__ import annotations
 import streamlit as st
 
 import config
-from services import llm_service as ollama_service
+# 🔥 Yahan Import Fix kiya hai (llm_service ki jagah ollama_service)
+from services import ollama_service
 from utils.health_check import run_all_checks
 from utils.helpers import section_header
 
 
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">⚙️ Settings</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Configure the local AI engine and inspect system status.</p>',
@@ -113,7 +120,7 @@ def render() -> None:
             except Exception as exc:  # never crash the app
                 st.error(f"Unexpected error: {exc}")
 
-        # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # System health
     # ------------------------------------------------------------------
     st.markdown(section_header("System Health"), unsafe_allow_html=True)
@@ -141,6 +148,7 @@ def render() -> None:
                 st.error(f"❌ **{name}** — {msg}")
                 if fix:
                     st.caption(f"Fix: {fix}")
+                    
     # ------------------------------------------------------------------
     # Privacy
     # ------------------------------------------------------------------

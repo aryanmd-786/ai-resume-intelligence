@@ -22,10 +22,12 @@ from views import (
     builder,
     career_assistant,
     dashboard,
+    feedback,          # 👈 Feedback module import kiya
     history,
     job_matcher,
     skill_gap,
 )
+from views import auth as auth_view          # 🔐 ADDED
 from views import settings as settings_view
 
 
@@ -45,7 +47,7 @@ st.set_page_config(
 load_css("assets/style.css")
 
 # ---------------------------------------------------------------------------
-# Ensure SQLite schema exists
+# Ensure SQLite schema exists (also creates users table + user_id migration)
 # ---------------------------------------------------------------------------
 database.init_db()
 
@@ -54,6 +56,12 @@ database.init_db()
 # ---------------------------------------------------------------------------
 _DEFAULTS = {
     "page": "🏠 Dashboard",
+
+    # 🔐 Auth
+    "logged_in": False,
+    "user_id": None,
+    "username": None,
+    "full_name": None,
 
     # Analyzer / shared resume data
     "last_analysis": None,
@@ -90,6 +98,49 @@ _DEFAULTS = {
 for _key, _value in _DEFAULTS.items():
     st.session_state.setdefault(_key, _value)
 
+
+# ---------------------------------------------------------------------------
+# 🔐 AUTH GATE — must run BEFORE any sidebar/page render
+# ---------------------------------------------------------------------------
+def _logout() -> None:
+    """Clear session and send user back to login page."""
+    for key in (
+        "logged_in",
+        "user_id",
+        "username",
+        "full_name",
+        # also reset user-scoped state so next login starts fresh
+        "page",
+        "last_analysis",
+        "last_analysis_id",
+        "last_resume_text",
+        "last_resume_name",
+        "analysis_result",
+        "skills_result",
+        "ats_result",
+        "last_job_match",
+        "last_job_description",
+        "job_match_result",
+        "skill_gap_result",
+        "builder_data",
+        "builder_seed",
+        "chat_history",
+        "resume_version",
+        "_pdf_path",
+        "_pdf_name",
+        "_docx_path",
+        "_docx_name",
+    ):
+        st.session_state.pop(key, None)
+    st.rerun()
+
+
+if not st.session_state.get("logged_in") or not st.session_state.get("user_id"):
+    # Show only the login/signup screen. Everything below is skipped.
+    auth_view.render_auth_page()
+    st.stop()
+
+
 # ---------------------------------------------------------------------------
 # Page registry
 # ---------------------------------------------------------------------------
@@ -102,8 +153,10 @@ PAGES: dict[str, callable] = {
     "📊 Resume Analytics": analytics.render,
     "🕒 Resume History": history.render,
     "🤖 AI Career Assistant": career_assistant.render,
+    "💬 Feedback": feedback.render,          # 👈 Feedback page add kiya
     "⚙️ Settings": settings_view.render,
 }
+
 
 # ---------------------------------------------------------------------------
 # Sidebar
@@ -121,6 +174,15 @@ with st.sidebar:
         """,
         unsafe_allow_html=True,
     )
+    st.markdown("---")
+
+    # 🔐 User greeting + logout
+    st.markdown(
+        f"**👋 Hi, {st.session_state.get('full_name') or st.session_state.get('username')}**"
+    )
+    st.caption(f"@{st.session_state.get('username')}")
+    if st.button("🚪 Logout", key="nav::logout", use_container_width=True):
+        _logout()
     st.markdown("---")
 
     # Navigation buttons

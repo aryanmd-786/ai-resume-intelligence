@@ -165,14 +165,21 @@ def _latest_skills_pie(latest_analysis: dict) -> go.Figure | None:
 # Page
 # ---------------------------------------------------------------------------
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">📊 Resume Analytics</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Track your resume improvement over time across every metric.</p>',
         unsafe_allow_html=True,
     )
 
-    analyses = database.get_all_analyses()
-    matches = database.get_all_job_matches()
+    # 🔐 Data fetch with user_id
+    analyses = database.get_all_analyses(user_id=uid)
+    matches = database.get_all_job_matches(user_id=uid)
 
     if not analyses and not matches:
         st.info(
@@ -182,7 +189,8 @@ def render() -> None:
         return
 
     # ---- KPI row -----------------------------------------------------
-    stats = database.get_dashboard_stats()
+    # 🔐 Stats fetch with user_id
+    stats = database.get_dashboard_stats(user_id=uid)
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:

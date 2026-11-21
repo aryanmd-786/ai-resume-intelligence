@@ -142,7 +142,7 @@ def _skills_pie(skills: dict) -> go.Figure:
 # ---------------------------------------------------------------------------
 # Analysis runner
 # ---------------------------------------------------------------------------
-def _run_analysis(resume_text: str, filename: str) -> None:
+def _run_analysis(resume_text: str, filename: str, uid: int) -> None:
     """Run the full AI analysis pipeline and store results in session_state."""
     status = st.status("🤖 AI is analyzing your resume...", expanded=True)
 
@@ -175,6 +175,7 @@ def _run_analysis(resume_text: str, filename: str) -> None:
         try:
             file_type = filename.rsplit(".", 1)[-1].lower() if "." in filename else "unknown"
             new_id = database.save_analysis(
+                user_id=uid,               # 🔐 Yahan user_id add kiya
                 filename=filename,
                 file_type=file_type,
                 resume_text=resume_text,
@@ -363,6 +364,12 @@ def _render_results() -> None:
 # Page
 # ---------------------------------------------------------------------------
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">📄 Resume Analyzer</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Upload your resume (PDF or DOCX) and let the local AI '
@@ -433,9 +440,7 @@ def render() -> None:
         st.rerun()
 
     if run:
-        _run_analysis(resume_text, uploaded.name)
+        _run_analysis(resume_text, uploaded.name, uid)
 
     # ---- Results -----------------------------------------------------
     _render_results()
-    
-        

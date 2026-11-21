@@ -62,6 +62,7 @@ def _seed_from_analyzer() -> None:
 
     if not data.get("summary") and seed.get("analysis", {}).get("summary"):
         data["summary"] = seed["analysis"]["summary"]
+        st.session_state.pop("bd_summary", None) # 🔥 Clear widget key so it updates
 
     skills_seed = seed.get("skills") or {}
     if skills_seed and not data.get("skills"):
@@ -70,6 +71,7 @@ def _seed_from_analyzer() -> None:
                     "cloud", "tools", "technical_skills"):
             flat.extend(skills_seed.get(key, []) or [])
         data["skills"] = list(dict.fromkeys(flat))
+        st.session_state.pop("bd_skills_text", None) # 🔥 Clear widget key
 
     st.session_state.builder_seed = None
 
@@ -261,7 +263,6 @@ def _html_preview(data: dict, theme: dict) -> str:
         ))
 
     # Build as ONE single line — no leading spaces anywhere.
-    # This prevents Streamlit's markdown parser from treating it as a code block.
     inner = "".join(parts)
     return (
         f'<div style="background:#fff;border:1px solid {divider};border-radius:12px;'
@@ -300,8 +301,12 @@ def _render_summary(data: dict) -> None:
                 data.get("experience", []), data.get("education", []),
             )
             if result:
-                data["summary"] = result
+                st.session_state["temp_summary_update"] = result
                 st.rerun()
+
+    # 🔥 FIX: Check temp update BEFORE rendering widget
+    if "temp_summary_update" in st.session_state:
+        st.session_state["bd_summary"] = st.session_state.pop("temp_summary_update")
 
     data["summary"] = st.text_area(
         "Summary",
@@ -343,6 +348,11 @@ def _render_education(data: dict) -> None:
 
 def _render_skills(data: dict) -> None:
     st.markdown("### 🧩 Skills")
+    
+    # 🔥 FIX: Check temp update BEFORE rendering widget
+    if "temp_skills_update" in st.session_state:
+        st.session_state["bd_skills_text"] = st.session_state.pop("temp_skills_update")
+
     current = data.get("skills") or []
     text = ", ".join(current) if isinstance(current, list) else str(current)
 
@@ -377,7 +387,7 @@ def _render_skills(data: dict) -> None:
     )
     data["skills"] = _to_list(new_text)
 
-    suggestions = st.session_state.pop("bd_skills_suggestions", None)
+    suggestions = st.session_state.get("bd_skills_suggestions")
     if suggestions:
         st.info("**AI suggestions** (click to add):")
         cols = st.columns(min(len(suggestions), 4))
@@ -386,7 +396,8 @@ def _render_skills(data: dict) -> None:
                 if st.button(f"➕ {s}", key=f"bd_skill_add_{idx}"):
                     if s not in data["skills"]:
                         data["skills"].append(s)
-                        st.session_state["bd_skills_text"] = ", ".join(data["skills"])
+                        st.session_state["temp_skills_update"] = ", ".join(data["skills"])
+                    st.session_state.pop("bd_skills_suggestions", None) # Clear suggestions after use
                     st.rerun()
 
 
@@ -399,6 +410,11 @@ def _render_experience(data: dict) -> None:
 
     for i, row in enumerate(rows):
         with st.expander(f"Experience #{i + 1}", expanded=(i == 0)):
+            # 🔥 FIX: Check temp update BEFORE rendering widget
+            temp_key = f"temp_bd_exp_resp_{i}"
+            if temp_key in st.session_state:
+                st.session_state[f"bd_exp_resp_{i}"] = st.session_state.pop(temp_key)
+
             c1, c2 = st.columns(2)
             with c1:
                 row["role"] = st.text_input("Role", value=row.get("role", ""), key=f"bd_exp_role_{i}")
@@ -427,13 +443,15 @@ def _render_experience(data: dict) -> None:
                         row.get("responsibilities", ""),
                     )
                     if result:
-                        row["responsibilities"] = result
-                        st.session_state[f"bd_exp_resp_{i}"] = result
+                        st.session_state[temp_key] = result
                         st.rerun()
             with c_b:
                 if len(rows) > 1:
                     if st.button(f"🗑️ Remove", key=f"bd_exp_del_{i}", use_container_width=True):
                         rows.pop(i)
+                        # Clear widget keys for this item so it doesn't leak
+                        for k in ("bd_exp_role_", "bd_exp_comp_", "bd_exp_dur_", "bd_exp_resp_"):
+                            st.session_state.pop(f"{k}{i}", None)
                         st.rerun()
 
     if st.button("➕ Add Experience", key="bd_exp_add"):
@@ -450,6 +468,11 @@ def _render_projects(data: dict) -> None:
 
     for i, row in enumerate(rows):
         with st.expander(f"Project #{i + 1}", expanded=(i == 0)):
+            # 🔥 FIX: Check temp update BEFORE rendering widget
+            temp_key = f"temp_bd_prj_desc_{i}"
+            if temp_key in st.session_state:
+                st.session_state[f"bd_prj_desc_{i}"] = st.session_state.pop(temp_key)
+
             row["name"] = st.text_input("Project Name", value=row.get("name", ""), key=f"bd_prj_name_{i}")
             row["technologies"] = st.text_input(
                 "Technologies", value=row.get("technologies", ""),
@@ -472,13 +495,15 @@ def _render_projects(data: dict) -> None:
                         row.get("technologies", ""),
                     )
                     if result:
-                        row["description"] = result
-                        st.session_state[f"bd_prj_desc_{i}"] = result
+                        st.session_state[temp_key] = result
                         st.rerun()
             with c_b:
                 if len(rows) > 1:
                     if st.button(f"🗑️ Remove", key=f"bd_prj_del_{i}", use_container_width=True):
                         rows.pop(i)
+                        # Clear widget keys for this item
+                        for k in ("bd_prj_name_", "bd_prj_tech_", "bd_prj_url_", "bd_prj_desc_"):
+                            st.session_state.pop(f"{k}{i}", None)
                         st.rerun()
 
     if st.button("➕ Add Project", key="bd_prj_add"):
@@ -527,6 +552,12 @@ def _render_extras(data: dict) -> None:
 # Page
 # ---------------------------------------------------------------------------
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">✨ Resume Builder</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Fill in your details (or import from the Analyzer), let AI polish '
@@ -545,6 +576,10 @@ def render() -> None:
     with top_right:
         if st.button("🗑️ Reset Builder", use_container_width=True):
             st.session_state.builder_data = _blank_state()
+            # 🔥 FIX: Clear all builder widget keys so they empty out
+            for k in list(st.session_state.keys()):
+                if k.startswith("bd_"):
+                    st.session_state.pop(k, None)
             st.success("Builder reset.")
             st.rerun()
 
@@ -610,6 +645,7 @@ def render() -> None:
                         st.session_state["_pdf_name"] = f"{base_name}_{theme['name']}_resume.pdf"
                         try:
                             database.save_generated_resume(
+                                user_id=uid,
                                 full_name=data["personal"].get("full_name", ""),
                                 template=theme["name"],
                                 file_path=str(out_path),
@@ -633,6 +669,7 @@ def render() -> None:
                         st.session_state["_docx_name"] = f"{base_name}_{theme['name']}_resume.docx"
                         try:
                             database.save_generated_resume(
+                                user_id=uid,
                                 full_name=data["personal"].get("full_name", ""),
                                 template=theme["name"],
                                 file_path=str(out_path),

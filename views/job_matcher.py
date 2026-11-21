@@ -86,7 +86,7 @@ def _relevance_bar(exp: int, edu: int) -> go.Figure:
 # ---------------------------------------------------------------------------
 # Analysis runner
 # ---------------------------------------------------------------------------
-def _run_match(resume_text: str, jd: str) -> None:
+def _run_match(resume_text: str, jd: str, uid: int) -> None:
     status = st.status("🤖 AI is matching your resume against the JD...", expanded=True)
     try:
         status.write("🎯 Computing match score...")
@@ -103,6 +103,7 @@ def _run_match(resume_text: str, jd: str) -> None:
         try:
             resume_id = st.session_state.get("last_analysis_id")
             database.save_job_match(
+                user_id=uid,  # 🔐 Yahan user_id add kiya
                 resume_id=resume_id,
                 jd_text=jd,
                 result=result,
@@ -204,6 +205,12 @@ def _render_results() -> None:
 # Page
 # ---------------------------------------------------------------------------
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">🎯 Job Description Matcher</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Paste a job description and see how well your resume matches — '
@@ -291,7 +298,8 @@ def render() -> None:
         elif len((jd or "").strip()) < 40:
             st.error("Please paste a longer job description (at least 40 characters).")
         else:
-            _run_match(resume_text, jd)
+            # 🔐 Pass uid to _run_match
+            _run_match(resume_text, jd, uid)
 
     # ------------------------------------------------------------------
     # Results

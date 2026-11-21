@@ -93,6 +93,12 @@ def _donut(have: int, improve: int, missing: int) -> go.Figure:
 # Page
 # ---------------------------------------------------------------------------
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">🧠 Skill Gap Analysis</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">See which skills you already have, which need improvement, '

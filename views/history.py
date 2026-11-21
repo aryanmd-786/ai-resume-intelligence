@@ -113,13 +113,20 @@ def _comparison_table(versions: list[dict]) -> None:
 # Page
 # ---------------------------------------------------------------------------
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">🕒 Resume History</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">All your analyzed resumes with score history and version comparison.</p>',
         unsafe_allow_html=True,
     )
 
-    resumes = database.get_all_resumes()
+    # 🔐 Fetch resumes for the current user
+    resumes = database.get_all_resumes(user_id=uid)
 
     if not resumes:
         st.info(
@@ -170,14 +177,16 @@ def render() -> None:
                     st.caption(f"Skills: {r.get('skills_count') or 0}")
                 with cols[4]:
                     if st.button("🗑️", key=f"del_resume_{r['id']}", help="Delete this resume"):
-                        if database.delete_resume(r["id"]):
+                        # 🔐 Pass user_id and resume_id
+                        if database.delete_resume(user_id=uid, resume_id=r["id"]):
                             st.success("Deleted.")
                             st.rerun()
                 st.markdown("---")
         return
 
     # ---- Single resume view ------------------------------------------
-    versions = database.get_analyses_for_resume(selected_name)
+    # 🔐 Pass user_id and resume_name
+    versions = database.get_analyses_for_resume(user_id=uid, resume_name=selected_name)
     if not versions:
         st.warning(f"No analyses found for **{selected_name}**.")
         return
@@ -239,6 +248,7 @@ def render() -> None:
             st.rerun()
     with c3:
         if st.button("🗑️ Delete ALL history", use_container_width=True, type="secondary"):
-            if database.clear_all():
+            # 🔐 Pass user_id to clear_all
+            if database.clear_all(user_id=uid):
                 st.success("All history cleared.")
                 st.rerun()

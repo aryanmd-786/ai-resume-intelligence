@@ -20,6 +20,12 @@ def _quick_action(label: str, target_page: str, key: str) -> None:
 
 
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">Dashboard</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Your AI resume intelligence workspace at a glance.</p>',
@@ -32,7 +38,8 @@ def render() -> None:
     analysis = st.session_state.get("last_analysis") or {}
     job_match_dict = st.session_state.get("last_job_match") or {}
 
-    stats = database.get_dashboard_stats()
+    # 🔐 Fetch stats for the current user
+    stats = database.get_dashboard_stats(user_id=uid)
 
     overall_score = stats.get("latest_overall_score") or analysis.get("overall_score") or 0
     ats_score = stats.get("latest_ats_score") or analysis.get("ats_score") or 0

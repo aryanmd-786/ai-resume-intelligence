@@ -103,6 +103,12 @@ def _handle_question(question: str) -> None:
 # Page
 # ---------------------------------------------------------------------------
 def render() -> None:
+    # 🔐 User authentication check
+    uid = st.session_state.get("user_id")
+    if not uid:
+        st.error("Session expire. Dobara login karo.")
+        st.stop()
+
     st.markdown('<h1 class="page-title">🤖 AI Career Assistant</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Chat with a local AI that knows your resume and job description.</p>',
